@@ -1,0 +1,162 @@
+import plotly.express as px
+import pandas as pd
+from sklearn.datasets import load_wine
+from dash import Dash, html, dcc, callback
+from dash.dependencies import Input, Output
+
+# Load the wine dataset
+def load_data():
+    wine = load_wine()
+    wine_df = pd.DataFrame(wine.data, columns=wine.feature_names)
+    wine_df["WineType"] = [wine.target_names[t] for t in wine.target]
+    return wine_df
+
+wine_df = load_data()
+ingredients = wine_df.drop(columns=["WineType"]).columns
+
+avg_wine_df = wine_df.groupby('WineType').mean().reset_index()
+
+# Function to create scatter chart
+def create_scatter_chart(x_axis="alcohol", y_axis="malic_acid", color_encode=False):
+    scatter_fig = px.scatter(wine_df, x=x_axis, y=y_axis, color="WineType" if color_encode else None,
+                             title="{} vs {}".format(x_axis.capitalize(), y_axis.capitalize()))
+    scatter_fig.update_layout(height=400)
+    return scatter_fig
+
+# Function to create bar chart
+def create_bar_chart(ingredients=["alcohol", "malic_acid", "ash"]):
+    bar_fig = px.bar(avg_wine_df, x="WineType", y=ingredients, title="Avg Ingredient per Wine Type")
+    bar_fig.update_layout(height=400)
+    return bar_fig
+
+# Function to create pie chart
+def create_pie_chart():
+    pie_fig = px.pie(wine_df, names='WineType', title="Distribution of Wine Types")
+    pie_fig.update_layout(height=400)
+    return pie_fig
+
+# Function to create box plot chart
+def create_box_plot():
+    box_fig = px.box(wine_df, x="WineType", y="alcohol", title="Alcohol Content Distribution by Wine Type")
+    box_fig.update_layout(height=400)
+    return box_fig
+
+# Function to create histogram chart
+def create_histogram():
+    hist_fig = px.histogram(wine_df, x="alcohol", title="Distribution of Alcohol Content")
+    hist_fig.update_layout(height=400)
+    return hist_fig
+
+# Function to create line chart
+def create_line_chart():
+    line_fig = px.line(avg_wine_df, x="WineType", y="alcohol", title="Average Alcohol Content per Wine Type")
+    line_fig.update_layout(height=400)
+    return line_fig
+
+# Dash app setup
+app = Dash(__name__, title="Wine Analysis")
+
+# Widgets
+x_axis = dcc.Dropdown(
+    id="x_axis", options=[{"label": col, "value": col} for col in ingredients], value="alcohol", clearable=False,
+    style={"display": "inline-block", "width": "47%"}
+)
+y_axis = dcc.Dropdown(
+    id="y_axis", options=[{"label": col, "value": col} for col in ingredients], value="malic_acid", clearable=False,
+    style={"display": "inline-block", "width": "47%"}
+)
+color_encode = dcc.Checklist(
+    id="color_encode", options=[{'label': 'Color-Encode', 'value': 'Color-Encode'}]
+)
+
+multi_select = dcc.Dropdown(
+    id='multi_select', options=[{"label": col, "value": col} for col in ingredients], value=["alcohol", "malic_acid", "ash"], clearable=False, multi=True
+)
+
+# Web app layout
+app.layout = html.Div(
+    children=[
+        html.H1("Wine Analysis Dashboard", style={"text-align": "center"}),
+        html.Div("Explore relationships between various ingredients used in the creation of three different types of wine", style={"text-align": "center"}),
+        html.Br(),
+        html.Div(
+            children=[
+                html.Div(
+                    children=[
+                        x_axis, y_axis, color_encode,
+                        dcc.Graph(id="scatter_chart", figure=create_scatter_chart())
+                    ],
+                    className="chart-box"
+                ),
+                html.Div(
+                    children=[
+                        multi_select, html.Br(),
+                        dcc.Graph(id="bar_chart", figure=create_bar_chart())
+                    ],
+                    className="chart-box"
+                ),
+                html.Div(
+                    children=[
+                        dcc.Graph(id="pie_chart", figure=create_pie_chart())
+                    ],
+                    className="chart-box"
+                ),
+            ],
+            style={"display": "flex", "justify-content": "space-around", "flex-wrap": "wrap"}
+        ),
+        html.Div(
+            children=[
+                html.Div(
+                    children=[
+                        dcc.Graph(id="box_plot", figure=create_box_plot())
+                    ],
+                    className="chart-box"
+                ),
+                html.Div(
+                    children=[
+                        dcc.Graph(id="histogram", figure=create_histogram())
+                    ],
+                    className="chart-box"
+                ),
+                html.Div(
+                    children=[
+                        dcc.Graph(id="line_chart", figure=create_line_chart())
+                    ],
+                    className="chart-box"
+                ),
+            ],
+            style={"display": "flex", "justify-content": "space-around", "flex-wrap": "wrap"}
+        )
+    ],
+    style={"padding": "50px"}
+)
+
+# Callbacks
+@callback(
+    Output('scatter_chart', "figure"),
+    [Input("x_axis", "value"), Input("y_axis", "value"), Input("color_encode", "value")]
+)
+def update_scatter_chart(x_axis, y_axis, color_encode):
+    return create_scatter_chart(x_axis, y_axis, color_encode)
+
+@callback(
+    Output('bar_chart', "figure"),
+    [Input('multi_select', "value")]
+)
+def update_bar_chart(ingredients):
+    return create_bar_chart(ingredients)
+
+if __name__ == "__main__":
+    app.run_server(debug=True)
+
+# Add this CSS to the assets folder in a file named "styles.css"
+# .chart-box {
+#     background-color: #f9f9f9;
+#     border: 1px solid #ddd;
+#     border-radius: 5px;
+#     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+#     padding: 20px;
+#     margin: 10px;
+#     flex: 1 1 30%;
+#     box-sizing: border-box;
+# }
